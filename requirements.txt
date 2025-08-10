@@ -1,0 +1,13 @@
+beautifulsoup4
+chromadb
+google-generativeai
+langchain
+langchain-google-genai
+pandas
+python-dotenv
+ragas>=0.1.7
+requests
+sentence-transformers
+streamlit
+tqdm
+rouge-score

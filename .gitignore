@@ -1,0 +1,76 @@
+# Environment variables
+.env.*
+!.env.example
+
+# Python bytecode/cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.conda/
+.python-version
+
+# Packaging / distribution
+.build/
+build/
+dist/
+.eggs/
+*.egg-info/
+*.egg
+wheels/
+pip-wheel-metadata/
+MANIFEST
+
+# Logs
+logs/
+*.log
+
+# Testing & coverage
+.pytest_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+.hypothesis/
+
+# Type checkers / linters
+.mypy_cache/
+.pytype/
+.pyre/
+.ruff_cache/
+.dmypy.json
+
+# IDE / Editor
+.vscode/
+.idea/
+*.code-workspace
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Streamlit
+.streamlit/secrets.toml
+.streamlit/config.toml
+
+# Project-specific: generated data and results
+data/chroma_db/
+!data/chroma_db/.gitkeep
+
+evaluation/results/
+!evaluation/results/.gitkeep
+
+# Optional scratch/cache folders
+data/tmp/
+data/cache/
