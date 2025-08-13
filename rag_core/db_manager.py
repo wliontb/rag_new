@@ -13,9 +13,10 @@ from config import settings
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class ChromaDBManager:
-    def __init__(self, embedding_function_name: str = settings.EMBEDDING_MODELS['vietnamese'], use_gpu: bool = False):
+    def __init__(self, embedding_function_name: str = settings.EMBEDDING_MODELS['vietnamese'], use_gpu: bool = False, collection_suffix: str = ""):
         """Khởi tạo DB Manager với một embedding function cụ thể."""
         self.client = chromadb.PersistentClient(path=str(settings.DB_DIR))
+        self.embedding_model_name = embedding_function_name
 
         # GPU optimization cho embedding
         self.use_gpu = use_gpu and torch.cuda.is_available()
@@ -40,14 +41,21 @@ class ChromaDBManager:
             else:
                 # CPU fallback
                 self.embedding_function = HuggingFaceEmbeddings(
-                    model_name=embedding_function_name
+                    model_name=embedding_function_name,
+                    model_kwargs={'trust_remote_code': True}
                 )
         else:
             self.embedding_function = None
 
         logging.info(f"Đã khởi tạo embedding model trên: {'GPU' if self.use_gpu else 'CPU'}")
 
-        self.collection_name = settings.CHROMA_COLLECTION_NAME
+        # Tạo collection name dựa trên embedding model
+        if collection_suffix:
+            self.collection_name = f"{settings.CHROMA_COLLECTION_NAME}_{collection_suffix}"
+        else:
+            # Tạo suffix từ tên model để đảm bảo unique
+            model_suffix = embedding_function_name.split('/')[-1].replace('-', '_')
+            self.collection_name = f"{settings.CHROMA_COLLECTION_NAME}_{model_suffix}"
         
         # Khởi tạo Langchain Chroma wrapper
         self.langchain_chroma = Chroma(
@@ -179,3 +187,64 @@ class ChromaDBManager:
             )
         
         return results
+
+
+class MultiEmbeddingDBManager:
+    """Manager để quản lý nhiều embedding models và collections."""
+    
+    def __init__(self, embedding_models: Dict[str, str] = None, use_gpu: bool = False):
+        """
+        Khởi tạo manager với nhiều embedding models.
+        
+        Args:
+            embedding_models: Dict với key là tên model (ví dụ: 'vietnamese', 'nomic') 
+                             và value là model path
+            use_gpu: Có sử dụng GPU hay không
+        """
+        if embedding_models is None:
+            embedding_models = settings.EMBEDDING_MODELS
+        
+        self.embedding_models = embedding_models
+        self.use_gpu = use_gpu
+        self.db_managers = {}
+        
+        # Khởi tạo DB manager cho mỗi embedding model
+        for model_name, model_path in embedding_models.items():
+            logging.info(f"Khởi tạo DB manager cho model: {model_name} ({model_path})")
+            self.db_managers[model_name] = ChromaDBManager(
+                embedding_function_name=model_path,
+                use_gpu=use_gpu,
+                collection_suffix=model_name
+            )
+    
+    def add_documents_to_all(self, articles: List[Dict[str, str]]):
+        """Thêm documents vào tất cả các collections."""
+        for model_name, db_manager in self.db_managers.items():
+            logging.info(f"Đang thêm {len(articles)} documents vào collection cho model: {model_name}")
+            db_manager.add_documents(articles)
+            logging.info(f"Hoàn tất thêm documents cho model: {model_name}")
+    
+    def get_db_manager(self, model_name: str) -> ChromaDBManager:
+        """Lấy DB manager cho một model cụ thể."""
+        return self.db_managers.get(model_name)
+    
+    def query_all_models(self, query_text: str, k: int = 5, start_date=None, end_date=None):
+        """Truy vấn trên tất cả các models và trả về kết quả từ mỗi model."""
+        results = {}
+        for model_name, db_manager in self.db_managers.items():
+            logging.info(f"Đang truy vấn model: {model_name}")
+            results[model_name] = db_manager.query(query_text, k, start_date, end_date)
+        return results
+    
+    def delete_all_collections(self):
+        """Xóa tất cả collections."""
+        for model_name, db_manager in self.db_managers.items():
+            logging.info(f"Đang xóa collection cho model: {model_name}")
+            db_manager.delete_collection()
+    
+    def list_collections(self):
+        """Liệt kê tất cả collections."""
+        collections = {}
+        for model_name, db_manager in self.db_managers.items():
+            collections[model_name] = db_manager.collection_name
+        return collections

@@ -39,10 +39,12 @@ class QueryAgent:
         if self.gpu_enabled:
             logging.info(f"GPU detected: {torch.cuda.get_device_name(0)}")
         
+        # Sử dụng collection suffix để chọn đúng collection
         embedding_model_name = settings.EMBEDDING_MODELS[embedding_method]
         self.db_manager = ChromaDBManager(
             embedding_function_name=embedding_model_name,
-            use_gpu=self.gpu_enabled
+            use_gpu=self.gpu_enabled,
+            collection_suffix=embedding_method  # Thêm collection_suffix để tương thích với multi-collection
         )
         self.rag_chain = self._create_rag_chain()
 
