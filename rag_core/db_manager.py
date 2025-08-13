@@ -132,6 +132,49 @@ class ChromaDBManager:
             logging.error(f"Lỗi khi truy vấn ChromaDB: {e}")
             return []
 
+    def get_collection_stats(self):
+        """Lấy thống kê về collection hiện tại."""
+        try:
+            collection = self.get_collection()
+            if collection:
+                # Lấy tổng số documents
+                count = collection.count()
+                
+                # Lấy một sample document để xem metadata
+                if count > 0:
+                    sample = collection.get(limit=1, include=["metadatas", "documents"])
+                    sample_metadata = sample["metadatas"][0] if sample["metadatas"] else {}
+                    sample_content = sample["documents"][0][:200] + "..." if sample["documents"] else ""
+                else:
+                    sample_metadata = {}
+                    sample_content = ""
+                
+                return {
+                    "collection_name": self.collection_name,
+                    "count": count,
+                    "embedding_model": self.embedding_model_name,
+                    "sample_metadata": sample_metadata,
+                    "sample_content": sample_content,
+                    "gpu_enabled": self.use_gpu
+                }
+            else:
+                return {
+                    "collection_name": self.collection_name,
+                    "count": 0,
+                    "embedding_model": self.embedding_model_name,
+                    "sample_metadata": {},
+                    "sample_content": "",
+                    "gpu_enabled": self.use_gpu,
+                    "error": "Collection chưa tồn tại"
+                }
+        except Exception as e:
+            logging.error(f"Lỗi khi lấy thống kê collection: {e}")
+            return {
+                "error": str(e),
+                "collection_name": self.collection_name,
+                "count": 0
+            }
+
     def view_all_documents(self):
         """Xem tất cả các tài liệu trong collection."""
         collection = self.get_collection()

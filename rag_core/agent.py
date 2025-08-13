@@ -18,8 +18,11 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 class QueryAgent:
     def __init__(self, embedding_method: str = 'vietnamese'):
         if embedding_method not in settings.EMBEDDING_MODELS:
-            raise ValueError(f"Phương thức embedding '{embedding_method}' không hợp lệ.")
+            raise ValueError(f"Phương thức embedding '{embedding_method}' không hợp lệ. "
+                           f"Các phương thức có sẵn: {list(settings.EMBEDDING_MODELS.keys())}")
 
+        self.embedding_method = embedding_method
+        
         # LLM mạnh mẽ cho việc sinh câu trả lời chính
         self.main_llm = ChatGoogleGenerativeAI(
             model=settings.GENERATION_MODEL_PRO,
@@ -47,6 +50,37 @@ class QueryAgent:
             collection_suffix=embedding_method  # Thêm collection_suffix để tương thích với multi-collection
         )
         self.rag_chain = self._create_rag_chain()
+        
+        logging.info(f"QueryAgent khởi tạo với embedding method: {embedding_method}")
+        logging.info(f"Collection name: {self.db_manager.collection_name}")
+
+    def switch_embedding_method(self, new_embedding_method: str):
+        """Chuyển đổi sang embedding method khác."""
+        if new_embedding_method not in settings.EMBEDDING_MODELS:
+            raise ValueError(f"Phương thức embedding '{new_embedding_method}' không hợp lệ.")
+        
+        if new_embedding_method != self.embedding_method:
+            self.embedding_method = new_embedding_method
+            embedding_model_name = settings.EMBEDDING_MODELS[new_embedding_method]
+            
+            # Tạo lại db_manager với collection mới
+            self.db_manager = ChromaDBManager(
+                embedding_function_name=embedding_model_name,
+                use_gpu=self.gpu_enabled,
+                collection_suffix=new_embedding_method
+            )
+            
+            logging.info(f"Đã chuyển sang embedding method: {new_embedding_method}")
+            logging.info(f"Collection name: {self.db_manager.collection_name}")
+
+    def get_current_collection_info(self):
+        """Lấy thông tin về collection hiện tại."""
+        return {
+            "embedding_method": self.embedding_method,
+            "embedding_model": settings.EMBEDDING_MODELS[self.embedding_method],
+            "collection_name": self.db_manager.collection_name,
+            "gpu_enabled": self.gpu_enabled
+        }
 
     def _create_rag_chain(self) -> Runnable:
         """Tạo chuỗi xử lý RAG với LLM chính."""
