@@ -1,30 +1,27 @@
 import json
 import logging
 from tqdm import tqdm
-
+import asyncio
 from config import settings
 from data_ingestion.scrapper import fetch_article_urls, scrape_article_content
 from data_ingestion.question_generator import generate_qa_from_article
-from data_ingestion.proposition_chunker import chunk_articles_into_propositions
+from data_ingestion.proposition_chunker import chunk_articles_into_propositions, chunk_articles_into_propositions_optimized
 from rag_core.db_manager import ChromaDBManager
-from evaluation.cost_tracker import CostCallbackHandler
+from data_ingestion.common import Data
 
 # Cấu hình logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def run_data_ingestion_pipeline():
-    """Chạy toàn bộ pipeline thu thập và xử lý dữ liệu."""
+async def run_data_ingestion_pipeline_async():
+    """Phiên bản async của pipeline."""
     logging.info("Bắt đầu pipeline thu thập dữ liệu...")
-
-    # Khởi tạo callback để theo dõi chi phí
-    cost_callback = CostCallbackHandler()
 
     # --- Bước 1: Cào dữ liệu --- #
     logging.info(f"Bắt đầu cào URL từ: {settings.SCRAPER_URL}")
-    article_urls = fetch_article_urls(settings.SCRAPER_URL, max_pages=2) # Giới hạn 1 trang để test
+    article_urls = fetch_article_urls(settings.SCRAPER_URL, max_pages=3) # Giới hạn 1 trang để test
     logging.info(f"Đã tìm thấy tổng cộng {len(article_urls)} URL duy nhất.")
 
-    scraped_articles = []
+    scraped_articles: list[Data] = []
     for url in tqdm(article_urls, desc="Đang cào nội dung các bài báo"):
         content = scrape_article_content(url)
         if content:
@@ -36,16 +33,18 @@ def run_data_ingestion_pipeline():
         return
 
     # --- Bước 2: Tạo QA Dataset --- #
-    # (Tạm thời bỏ qua theo dõi chi phí ở bước này để đơn giản)
     logging.info("Bắt đầu tạo QA dataset từ các bài báo đã cào...")
     qa_dataset = []
     for article in tqdm(scraped_articles, desc="Đang tạo QA"):
-        qa_pair = generate_qa_from_article(article['content'])
+        qa_pair = generate_qa_from_article(article.content)
         if qa_pair:
             qa_dataset.append({
+                "id": article.id,
+                "date": article.date,
+                "title": article.title,
                 "question": qa_pair["question"],
                 "answer": qa_pair["answer"],
-                "contexts": [article['content']],
+                "contexts": [article.content],
                 "ground_truth": qa_pair["answer"]
             })
 
@@ -53,13 +52,16 @@ def run_data_ingestion_pipeline():
         json.dump(qa_dataset, f, ensure_ascii=False, indent=4)
     logging.info(f"Đã lưu {len(qa_dataset)} cặp QA vào file: {settings.QA_DATASET_PATH}")
 
-    # --- Bước 3: Proposition Chunking và Indexing --- #
-    logging.info("Bắt đầu chia nhỏ các bài báo thành các mệnh đề...")
-    cost_callback.reset() # Reset chi phí trước khi bắt đầu chunking
-    proposition_documents = chunk_articles_into_propositions(scraped_articles, callback_handler=cost_callback)
+    # --- Bước 3: Optimized Proposition Chunking --- #
+    logging.info("Bắt đầu chia nhỏ các bài báo thành các mệnh đề (optimized)...")
+    
+    proposition_documents = await chunk_articles_into_propositions_optimized(
+        scraped_articles,
+        batch_size=10,  # Xử lý 10 articles song song
+        max_workers=4   # Giới hạn concurrent requests
+    )
+    
     logging.info(f"Đã tạo {len(proposition_documents)} mệnh đề.")
-    chunking_costs = cost_callback.get_costs()
-    logging.info(f"Chi phí cho bước Proposition Chunking: {chunking_costs}")
 
     logging.info("Bắt đầu indexing dữ liệu vào ChromaDB...")
     db_manager = ChromaDBManager()
@@ -67,6 +69,10 @@ def run_data_ingestion_pipeline():
     logging.info("Hoàn tất indexing dữ liệu.")
 
     logging.info("Pipeline thu thập dữ liệu đã hoàn tất.")
+
+def run_data_ingestion_pipeline():
+    """Wrapper để chạy async pipeline."""
+    asyncio.run(run_data_ingestion_pipeline_async())
 
 if __name__ == "__main__":
     run_data_ingestion_pipeline()

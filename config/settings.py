@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 from pathlib import Path
+import torch
 
 # Tải biến môi trường từ file .env
 load_dotenv()
@@ -18,7 +19,7 @@ QA_DATASET_PATH = DATA_DIR / "qa_dataset.json"
 EVAL_RESULTS_DIR = ROOT_DIR / "evaluation" / "results"
 
 # --- Cấu hình Scraper ---
-SCRAPER_URL = "https://thoibaotaichinhvietnam.vn/chung-khoan"
+SCRAPER_URL = "https://thoibaotaichinhvietnam.vn/chung-khoan&s_cond=&BRSR="
 
 # --- Cấu hình mô hình ---
 # Sử dụng một dictionary để dễ dàng quản lý và lựa chọn các mô hình
@@ -32,3 +33,17 @@ GENERATION_MODEL_FLASH = "gemini-1.5-flash-latest"
 
 # --- Cấu hình ChromaDB ---
 CHROMA_COLLECTION_NAME = "financial_news"
+
+# GPU Configuration
+GPU_ENABLED = torch.cuda.is_available()
+GPU_MEMORY_FRACTION = 0.7  # Sử dụng 70% GPU memory
+EMBEDDING_BATCH_SIZE = 32 if GPU_ENABLED else 8
+MIXED_PRECISION = True
+
+# Log GPU status
+if GPU_ENABLED:
+    print(f"GPU detected: {torch.cuda.get_device_name(0)}")
+    print(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
+    torch.cuda.set_per_process_memory_fraction(GPU_MEMORY_FRACTION)
+else:
+    print("GPU not available, using CPU")

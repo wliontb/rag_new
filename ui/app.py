@@ -44,14 +44,23 @@ if st.button("Tìm kiếm câu trả lời"):
             try:
                 answer, retrieved_docs = st.session_state.agent.answer(question)
 
-                st.subheader("Câu trả lời tổng hợp:")
-                st.markdown(answer)
+                if not retrieved_docs:
+                    st.warning("Không tìm thấy thông tin liên quan đến câu hỏi của bạn.")
+                else:
+                    st.subheader("Câu trả lời tổng hợp:")
+                    st.markdown(answer)
 
-                st.subheader("Các nguồn thông tin được sử dụng:")
-                for i, doc in enumerate(retrieved_docs):
-                    with st.expander(f"Nguồn {i+1}: {doc.metadata.get('title', 'Không có tiêu đề')}"):
-                        st.write(f"**Nguồn:** [{doc.metadata.get('source')}]({doc.metadata.get('source')})")
-                        st.write("**Nội dung trích dẫn:**")
-                        st.caption(doc.page_content)
+                    st.subheader("Các nguồn thông tin được sử dụng:")
+                    for i, doc in enumerate(retrieved_docs):
+                        with st.expander(f"Nguồn {i+1}: {doc.metadata.get('title', 'Không có tiêu đề')}"):
+                            st.write(f"**Nguồn:** [{doc.metadata.get('source')}]({doc.metadata.get('source')})")
+                            st.write("**Nội dung trích dẫn:**")
+                            st.caption(doc.page_content)
+                            
             except Exception as e:
                 st.error(f"Đã xảy ra lỗi trong quá trình xử lý: {e}")
+                # Debug information
+                with st.expander("Chi tiết lỗi (Debug)"):
+                    st.code(str(e))
+                    import traceback
+                    st.code(traceback.format_exc())
