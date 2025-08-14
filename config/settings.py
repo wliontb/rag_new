@@ -28,8 +28,8 @@ EMBEDDING_MODELS = {
     "nomic": "nomic-ai/nomic-embed-text-v1.5",
 }
 
-GENERATION_MODEL_PRO = "gemini-1.5-pro-latest"
-GENERATION_MODEL_FLASH = "gemini-1.5-flash-latest"
+GENERATION_MODEL_PRO = "gemini-2.5-pro"
+GENERATION_MODEL_FLASH = "gemini-2.5-flash"
 
 # --- Cấu hình ChromaDB ---
 CHROMA_COLLECTION_NAME = "financial_news"

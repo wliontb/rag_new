@@ -4,6 +4,7 @@ from tqdm import tqdm
 import asyncio
 from config import settings
 from data_ingestion.scrapper import fetch_article_urls, scrape_article_content
+from data_ingestion.scrapper_vnexpress import vne_fetch_article_urls, vne_scrape_article_content
 from data_ingestion.question_generator import generate_qa_from_article
 from data_ingestion.proposition_chunker import chunk_articles_into_propositions, chunk_articles_into_propositions_optimized
 from rag_core.db_manager import ChromaDBManager, MultiEmbeddingDBManager
@@ -20,8 +21,12 @@ async def run_data_ingestion_pipeline_async():
     logging.info(f"Bắt đầu cào URL từ: {settings.SCRAPER_URL}")
     article_urls = fetch_article_urls(settings.SCRAPER_URL, max_pages=3) # Giới hạn 1 trang để test
     logging.info(f"Đã tìm thấy tổng cộng {len(article_urls)} URL duy nhất.")
-
+    logging.info(f"Bắt đầu cào URL từ: VNEXPRESS")
+    vne_article_urls = vne_fetch_article_urls()
+    logging.info(f"Đã tìm thấy tổng cộng {len(vne_article_urls)} URL VNEXPRESS duy nhất.")
+    
     scraped_articles: list[Data] = []
+    
     for url in tqdm(article_urls, desc="Đang cào nội dung các bài báo"):
         content = scrape_article_content(url)
         if content:
@@ -32,7 +37,20 @@ async def run_data_ingestion_pipeline_async():
         logging.warning("Không có bài báo nào được cào. Dừng pipeline.")
         return
 
+    vne_scraped_articles: list[Data] = []
+    for url in tqdm(vne_article_urls, desc="Đang cào nội dung các bài báo VNEXPRESS"):
+        content = vne_scrape_article_content(url)
+        if content:
+            vne_scraped_articles.append(content)
+    logging.info(f"Đã cào thành công nội dung của {len(vne_scraped_articles)} bài báo VNEXPRESS.")
+
+    if not vne_scraped_articles:
+        logging.warning("Không có bài báo VNEXPRESS nào được cào. Dừng pipeline.")
+        return
+
     # --- Bước 2: Tạo QA Dataset --- #
+    scraped_articles.extend(vne_scraped_articles)
+    print(f"Đã cào tổng cộng {len(scraped_articles)} bài báo từ cả 2 nguồn.")
 
     # Check nếu qa_dataset.json đã có dữ liệu thì bỏ qua bước này mà lấy dữ liệu đang có để chunking luôn
     try:
